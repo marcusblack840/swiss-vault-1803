@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SWISS REPOSITORY 1803 // Subterranean Architectural Dossier</title>
+  
+  <!-- Dependencies -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cinzel:wght@600;700;800;900&family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #030712; }
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-mono { font-family: 'Fira Code', monospace; }
+    .font-hand { font-family: 'Caveat', cursive; }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* Tactical Blueprint Grid */
+    .blueprint-grid {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(14, 165, 233, 0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(14, 165, 233, 0.07) 1px, transparent 1px);
+    }
+
+    /* Glow utilities */
+    .glow-amber { box-shadow: 0 0 35px -8px rgba(245, 158, 11, 0.25); }
+    .glow-cyan { box-shadow: 0 0 35px -8px rgba(14, 165, 233, 0.25); }
+    .glow-crimson { box-shadow: 0 0 35px -8px rgba(239, 68, 68, 0.3); }
+
+    /* SVG Interactive Room States */
+    .blueprint-room {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .blueprint-room:hover {
+      filter: brightness(1.25);
+    }
+
+    /* Undercroft restricted pulse */
+    @keyframes undercroft-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); }
+      50% { box-shadow: 0 0 20px 4px rgba(239, 68, 68, 0.25); }
+    }
+    .undercroft-active {
+      animation: undercroft-pulse 2.4s ease-in-out infinite;
+    }
+
+    /* Lightbox */
+    .lightbox-backdrop {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(2, 6, 23, 0.92);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+      backdrop-filter: blur(6px);
+    }
+    .lightbox-card {
+      max-width: 920px; width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+    }
+    .lightbox-img {
+      width: 100%; max-height: 70vh; object-fit: contain;
+      background: #020617;
+    }
+
+    /* Gate typewriter line */
+    .gate-line {
+      overflow: hidden;
+      white-space: nowrap;
+      border-right: 2px solid #f59e0b;
+      animation: gate-type 2.8s steps(48, end) 0.3s both, gate-blink 0.8s step-end infinite;
+      max-width: 100%;
+    }
+    @keyframes gate-type {
+      from { width: 0; }
+      to { width: 100%; }
+    }
+    @keyframes gate-blink {
+      50% { border-color: transparent; }
+    }
+
+    /* Artifact card hover for zoom affordance */
+    .artifact-img-wrap {
+      cursor: zoom-in;
+      position: relative;
+    }
+    .artifact-img-wrap::after {
+      content: "Click to enlarge";
+      position: absolute; bottom: 8px; right: 8px;
+      font-size: 10px; font-family: 'Fira Code', monospace;
+      background: rgba(2,6,23,0.85); color: #94a3b8;
+      padding: 2px 8px; border-radius: 4px; border: 1px solid #334155;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .artifact-img-wrap:hover::after { opacity: 1; }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen selection:bg-amber-500 selection:text-slate-950">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const VALID_CODES = [
+      "RIPARIAN-FLOTSAM",
+      "ORANGE-BISCUIT",
+      "ORANGE-BISCUITS",
+      "VALAIS-1803",
+      "CUSTODIAL-1678",
+      "SUMMUS-MAGISTER-MAXIMUS"
+    ];
+
+    // --- REPOSITORY DATA STORE WITH ARTIFACT IMAGES & LORE ---
+    const REPOSITORY_DATA = {
+      facility: {
+        established: "1803 CE (Commissioned 1792)",
+        location: "Canton of Valais, Swiss Confederation",
+        depth: "200 ft beneath living Alpine granite",
+        footprint: "2,500 m² (26,909 sq ft)",
+        counsel: "Whitmore, Sterling & Associates (London, Est. 1678)",
+        climate: "Constant 14°C / 42% Relative Humidity (Natural Charcoal Siphon System)"
+      },
+      rooms: [
+        {
+          id: "rotunda",
+          code: "SEC-01",
+          name: "Central Nexus & Master Vestibule",
+          area: "420 m²",
+          depth: "Elev. -61.0m",
+          status: "Air-Exchange Nominal // Armed Swiss Sentries (1803–1848)",
+          spec: "Octagonal vaulted granite hall with eight 3-foot load-bearing granite pillars. Fitted with Jonathan Whitmore IV’s mahogany desk, brass hydrostatic scales, and the 1803 handover register.",
+          description: "The primary junction connecting all subterranean wings. Bounded by two sequential air-tight blast doors.",
+          items: [
+            {
+              id: "KEY-1803",
+              name: "The Interlocking Handover Keys",
+              era: "1803 CE",
+              origin: "London / Geneva",
+              tag: "Underwriters' Master Key",
+              desc: "Twelve complex tumbler keys and one small symbolic brass key handed over by Jonathan Whitmore IV upon structural sign-off.",
+              img: null
+            }
+          ],
+          report: {
+            appraiser: "Jonathan Whitmore IV, Senior Partner",
+            date: "February 14, 1808",
+            verdict: "Unencumbered Custodianship Verified",
+            text: "All covenants of non-divulgence have been executed. The seven crown examiners arrived under armed Swiss carriage from Geneva. The undercroft remains hermetically insulated. Honoraria of fifty guineas disbursed per schedule."
+          },
+          perseusNote: "The airlock is dramatic, but the draft is real. Tell the solicitors to grease the secondary hinges; they groan louder than the Babylonian water screws."
+        },
+        {
+          id: "armory",
+          code: "SEC-02",
+          name: "Sector Alpha: The Armory (Iron & Steel)",
+          area: "680 m²",
+          depth: "Elev. -61.5m",
+          status: "Dry Lanolin & Mutton Tallow Preservative // Zero Oxidation",
+          spec: "Long vaulted gallery reinforced with ribbed arches. Contains weapon racks, Roman armor stands, and custom oak plinths.",
+          description: "Houses ancient hoplite iron, Sub-Roman pattern-welded blades, and cavalry gear. No item has ever touched excavation clay.",
+          items: [
+            {
+              id: "ITEM #0001",
+              name: "The Thermopylae Hoplite Xiphos",
+              era: "c. 480 BCE",
+              origin: "Thermopylae, Greece",
+              tag: "SENTIMENTAL REASONS // DO NOT TOUCH // STILL SHARP",
+              desc: "Heavy Archaic iron leaf-shaped blade with a cast-bronze hilt, resting on a Spartan Lambda (Λ) bronze shield. Free of verdigris; wiped down with mutton tallow every twenty years. The pommel bears soot from an 18th-century bedchamber candle.",
+              img: "images/item_0001_xiphos.png",
+              plaqueQuote: "SWORD IRON & BRONZE c. 480 BCE THERMOPYLAE. SENTIMENTAL REASONS. DO NOT TOUCH. STILL SHARP."
+            },
+            {
+              id: "ITEM #0043",
+              name: "Pattern-Welded Insular Broadsword ('Caliburnus / Excalibur')",
+              era: "c. 5th–6th Century CE",
+              origin: "Somerset / Camlann, Britain",
+              tag: "EXACT PROVENANCE UNCERTAIN (PROBABLY EXCALIBUR)",
+              desc: "Five feet of high-carbon iron; six bundles of twisted steel folded eight times. Running Celtic knotwork in beaten gold along the spine; river-oak pommel. Recovered from the lakebed following the altercation at Camlann.",
+              img: "images/item_0043_excalibur.png",
+              plaqueQuote: "SWORD, BRITISH, C. 5TH-6TH C. EXACT PROVENANCE UNCERTAIN. (PROBABLY EXCALIBUR)."
+            }
+          ],
+          report: {
+            appraiser: "Dr. Heinrich Müller (Prussian Royal Armory)",
+            date: "February 15, 1808",
+            verdict: "Sub-Roman Pattern-Welded Masterpiece",
+            text: "DO NOT CALL THIS RIPARIAN FLOTSAM! The blade matches Nennius's insular traditions to the millimeter! The client took the weapon of Artus from the meres because he refused to waste sixty ounces of refined steel! I required half a bottle of plum brandy to regain the use of my legs."
+          },
+          perseusNote: "Iron was dear in the sixth century. Leaving sixty ounces of pattern-welded steel in a bog is gross negligence. Tell Müller his plum brandy smells like wood-stripper."
+        },
+        {
+          id: "scriptoria",
+          code: "SEC-03",
+          name: "Sector Beta: The Scriptoria & Numismatic Bay",
+          area: "580 m²",
+          depth: "Elev. -62.0m",
+          status: "Cedar Pods // Dual-Stage Lavender Moisture Barriers",
+          spec: "Double-walled cedar chambers constructed inside granite to buffer atmospheric moisture. Fitted with airtight bronze canisters and baize coin trays.",
+          description: "Preserves organic papyri, parchment codices, Leonardo da Vinci's working sketches, and two millennia of unbroken currency.",
+          items: [
+            {
+              id: "ITEM #6234",
+              name: "Gaius Julius Caesar Silver Denarius",
+              era: "c. 49 BCE",
+              origin: "Rubicon / Rome",
+              tag: "Quantity: 1 coin // Worn by Wool Friction",
+              desc: "Silver denarius struck with the profile of Julius Caesar (DICT). The high relief on the brow and reverse rim has been softened by pocket-friction across three hundred years of linen and wool breeches.",
+              img: "images/item_6234_denarius.png",
+              plaqueQuote: "Caesar gave it to me personally at the Rubicon. Sentimental value."
+            },
+            {
+              id: "ITEM #2156",
+              name: "Leonardo da Vinci's Personal Working Notebook",
+              era: "c. 1519 CE",
+              origin: "Florence / Amboise, Italy & France",
+              tag: "Vellum & Rag Paper // Leather Bound",
+              desc: "Thick calfskin notebook held open with brass clips. Left page shows anatomical shoulder dissections and ornithopter wing gears; right page contains the original Vitruvian Man proportions and mirror-script notes.",
+              img: "images/item_2156_notebook.png",
+              plaqueQuote: "Leonardo's ramblings... Miss that guy. He was fun."
+            },
+            {
+              id: "ITEM #2034",
+              name: "47 Papyrus Scrolls of the Mouseion",
+              era: "c. 300–48 BCE",
+              origin: "Alexandria, Egypt",
+              tag: "Ancient Greek Cyperus Papyrus // 47 Scrolls",
+              desc: "Cyperus papyrus displayed within a sealed brass vitrine. Contains the lost dialogue on the poets by Aristotle. Rescued from the harbor annex prior to Caesar's siege.",
+              img: "images/item_2034_scrolls.png",
+              plaqueQuote: "Oops. (Seemed rude to bring them back after that fire incident.)"
+            },
+            {
+              id: "ITEM #3142",
+              name: "Original Quarto Folio & Working Playscripts",
+              era: "c. 1603 CE",
+              origin: "London, England",
+              tag: "Vellum & Calfskin // Playscripts of W.S.",
+              desc: "Quarto volume bound in calfskin containing working manuscripts and stage notes for Hamlet, Macbeth, and A Midsummer Night's Dream, accompanied by early architectural sketches of the Globe Theatre.",
+              img: "images/item_3142_shakespeare.png",
+              plaqueQuote: "Will's early work... and all the ghost parts I told him about. He still owes me five shillings."
+            }
+          ],
+          report: {
+            appraiser: "Prof. Alain Bertrand & Mr. Thomas Graves (Académie / Royal Mint)",
+            date: "February 16, 1808",
+            verdict: "Authentic // Incalculable Scholarly Value",
+            text: "Aristotle's lost uncials are sitting in a cedar box smelling of dried lavender! This is the dialogue the ancient world believed turned to ash! Meanwhile, Mr. Graves confirms the Caesar denarius was carried as pocket change for three centuries. Bertrand had to be removed from the flags."
+          },
+          perseusNote: "I didn't steal them. I borrowed them, the harbor caught fire, and returning them felt awkward. The library would be proud of the cedar canisters. Still waiting on Will's royalties."
+        },
+        {
+          id: "regalia",
+          code: "SEC-04",
+          name: "Sector Gamma: Imperial Regalia & Curiosities",
+          area: "480 m²",
+          depth: "Elev. -61.2m",
+          status: "Reinforced Mahogany Presses // Genoa Velvet",
+          spec: "Pillared display hall designed to isolate heavy metallic regalia, ancient architectural stones, and royal jewelry.",
+          description: "Storage for sovereign tokens, imperial crown jewels, and architectural fragments given in place of cash payment.",
+          items: [
+            {
+              id: "ITEM #3045",
+              name: "Neo-Babylonian Lapis Lazuli Paving Tile",
+              era: "c. 6th Century BCE (590 BCE)",
+              origin: "Hanging Gardens of Babylon",
+              tag: "Solid Lapis Lazuli & Pure Beaten Silver",
+              desc: "Heavy square paving tile of river-bottom blue lapis flecked with gold pyrites, inlaid with silver ribbons depicting date palms and pomegranates. Underside bears bitumen mortar ridges; top shows thirty years of royal sandal wear.",
+              img: "images/item_3045_tile.png",
+              plaqueQuote: "Tile from the Hanging Gardens. Got it as a gift for helping with some engineering advice. Gardens were genuinely impressive before they fell apart."
+            },
+            {
+              id: "ITEM #0687",
+              name: "Cleopatra VII's Royal Seal Ring",
+              era: "c. 48 BCE",
+              origin: "Alexandria, Egypt",
+              tag: "Gold & Untreated Ceylon Sapphire",
+              desc: "Heavy gold signet shank with fine granulation filigree, centering an oval cabochon sapphire carved with the royal Ptolemaic cartouche. Given as honorarium for Greek administrative translation.",
+              img: "images/item_0687_ring.png",
+              plaqueQuote: "FRIENDS ONLY (Note from Owner)"
+            },
+            {
+              id: "ITEM #0456",
+              name: "The Corona Consilii ('Charlemagne's Crown')",
+              era: "c. 800 CE",
+              origin: "Aachen / Rome (Frankish)",
+              tag: "Gold, Rubies, Emeralds // Weight: 22 oz",
+              desc: "Open-hoop imperial crown of eight hinged arched plates of beaten Frankish gold. Encrusted with raw Burmese rubies, moss-green emeralds, and pearls, surmounted by a gemmed cross.",
+              img: "images/item_0456_crown.png",
+              plaqueQuote: "TOO HEAVY (Note from Owner)"
+            }
+          ],
+          report: {
+            appraiser: "Lady Margaret Hollis (Oxford Archaeological Patron)",
+            date: "February 17, 1808",
+            verdict: "Continuous Possession // Sole Fiduciary",
+            text: "No biological dynasty survives twenty-five centuries! The Julio-Claudians died in five generations; the Plantagenets butchered one another in the snow! Yet Whitmore insists an un-dissolved Sole Fiduciary Custodianship holds continuous title. I have signed under protest. This firm is an abomination before history."
+          },
+          perseusNote: "Charlemagne insisted. Gave me a headache for three days. Currently lives on a table because it's too heavy for a human skull. The Babylonian tile makes an exceptional doorstop."
+        },
+        {
+          id: "undercroft",
+          code: "SEC-05",
+          name: "Sub-Level 7: The Levantine Undercroft (RESTRICTED)",
+          area: "340 m²",
+          depth: "Elev. -68.5m (Deep Redoubt)",
+          status: "SEALED // Lead-Sheathed // Clementine Bull of 1734 Active",
+          spec: "Isolated granite vault accessed via an offset dog-leg blast corridor. The doorway is framed in 4-inch lead sheeting and cold-hammered iron straps.",
+          description: "Contains items brought out of Jerusalem and Sinai prior to the fall of the Second Temple. Unopened pursuant to perpetual instructions.",
+          items: [
+            {
+              id: "ITEM #0102",
+              name: "The Sealed Oak Crate ('The Munich Crate')",
+              era: "Antiquity (Biblical Era)",
+              origin: "Levant / Munich Storage",
+              tag: "DIMENSIONS: 2.5 x 1.5 CUBITS // UNOPENED",
+              desc: "Heavy acacia and oak case sheathed in cold-rolled lead sheeting, bound with iron bands bearing unbroken wax seals. Acquired in Jerusalem; kept in Munich until 1803.",
+              img: null,
+              plaqueQuote: "Sealed lead chest. Value: Incalculable. Do not part the seals under any circumstances."
+            },
+            {
+              id: "ITEM #1087",
+              name: "The Judean Terracotta Wine Cup",
+              era: "Spring, 33 CE",
+              origin: "Jerusalem",
+              tag: "Common Domestic Clay // Tagged: Jerusalem, Spring, 33 CE",
+              desc: "Modest unglazed terracotta wine vessel. Shows thumb-wear on the foot rim. Placed upon a velvet plinth beside the sealed chest.",
+              img: null,
+              plaqueQuote: "Common domestic Judean ware from the Tiberian administration."
+            }
+          ],
+          report: {
+            appraiser: "Dr. James Whitfield (Senior Keeper, The British Museum)",
+            date: "February 18, 1808",
+            verdict: "EXAMINATION FORMALLY REFUSED",
+            text: "I did not examine the table. I addressed the granite wall four inches from my nose. I inform you that my cognitive faculties were adjourned. If I look upon that table again, King George will order me to annex it and I possess neither the cavalry nor the depravity for it. Recorded on schedule as three barrels of kitchen crockery."
+          },
+          perseusNote: "Never opened it. Never going to open it. Whitfield was completely right to face the wall. Do not touch the lead bands."
+        }
+      ]
+    };
+
+    function App() {
+      const [isUnlocked, setIsUnlocked] = useState(false);
+      const [passInput, setPassInput] = useState('');
+      const [passError, setPassError] = useState(false);
+      const [activeRoom, setActiveRoom] = useState(REPOSITORY_DATA.rooms[0]);
+      const [activeTab, setActiveTab] = useState('inventory'); // 'inventory', 'appraisal', 'marginalia'
+      const [lightboxItem, setLightboxItem] = useState(null);
+      const [clearedAt, setClearedAt] = useState(null);
+      const [showGateIntro, setShowGateIntro] = useState(true);
+
+      useEffect(() => {
+        const saved = localStorage.getItem('swiss_vault_clearance');
+        const ts = localStorage.getItem('swiss_vault_cleared_at');
+        if (saved === 'granted') {
+          setIsUnlocked(true);
+          if (ts) setClearedAt(ts);
+        }
+      }, []);
+
+      useEffect(() => {
+        if (!lightboxItem) return;
+        const onKey = (e) => { if (e.key === 'Escape') setLightboxItem(null); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [lightboxItem]);
+
+      const handleUnlock = (e) => {
+        e.preventDefault();
+        const clean = passInput.trim().toUpperCase();
+        if (VALID_CODES.includes(clean)) {
+          const ts = new Date().toISOString();
+          setIsUnlocked(true);
+          setPassError(false);
+          setClearedAt(ts);
+          localStorage.setItem('swiss_vault_clearance', 'granted');
+          localStorage.setItem('swiss_vault_cleared_at', ts);
+        } else {
+          setPassError(true);
+        }
+      };
+
+      const handleRelock = () => {
+        setIsUnlocked(false);
+        setClearedAt(null);
+        setLightboxItem(null);
+        localStorage.removeItem('swiss_vault_clearance');
+        localStorage.removeItem('swiss_vault_cleared_at');
+        setPassInput('');
+        setShowGateIntro(true);
+      };
+
+      const formatCleared = (iso) => {
+        if (!iso) return '';
+        try {
+          const d = new Date(iso);
+          return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+        } catch { return iso; }
+      };
+
+      // --- GATE SCREEN ---
+      if (!isUnlocked) {
+        return (
+          <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-6 blueprint-grid relative">
+            <div className="max-w-md w-full bg-slate-900/95 border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 glow-amber backdrop-blur">
+              <div className="text-center space-y-3 mb-6">
+                <div className="w-14 h-14 mx-auto rounded-full bg-amber-950/60 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                  </svg>
+                </div>
+                <h1 className="text-2xl font-cinzel font-black tracking-widest text-amber-300">SWISS REPOSITORY</h1>
+                <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
+                  Canton of Valais // Est. 1803 CE // Depth 200 ft
+                </p>
+                <div className="h-px w-20 bg-amber-500/40 mx-auto" />
+                <p className="text-[11px] font-mono text-amber-500/90 gate-line mx-auto" style={{ maxWidth: '100%' }}>
+                  SOLE FIDUCIARY CUSTODIANSHIP // WHITMORE STERLING 1678
+                </p>
+                <p className="text-xs text-slate-400 italic leading-relaxed px-1">
+                  "Unbroken title held in trust without probate severance. Non-divulgence covenants remain in force. Clearance required for adit access."
+                </p>
+                <p className="text-[10px] font-mono text-slate-500">
+                  Authorized phrases only. Attempts are logged.
+                </p>
+              </div>
+
+              <form onSubmit={handleUnlock} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">
+                    Enter Custodial Key / Underwriter Passcode:
+                  </label>
+                  <input
+                    type="text"
+                    value={passInput}
+                    onChange={(e) => { setPassInput(e.target.value); setPassError(false); }}
+                    placeholder="e.g. RIPARIAN-FLOTSAM"
+                    className={`w-full bg-slate-950 border px-4 py-3 rounded-lg font-mono text-sm tracking-wider text-white placeholder-slate-600 focus:outline-none transition-colors ${passError ? 'border-rose-500 text-rose-300' : 'border-slate-700 focus:border-amber-400'}`}
+                  />
+                  {passError && (
+                    <p className="text-rose-400 text-xs font-mono mt-1.5 flex items-center gap-1">
+                      ⚠️ Invalid Passcode. Verify against Payhip confirmation.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold font-cinzel py-3 rounded-lg text-sm tracking-widest transition-all shadow-lg"
+                >
+                  DISENGAGE TUMBLERS & ENTER
+                </button>
+              </form>
+
+              <div className="mt-8 pt-6 border-t border-slate-800 text-center">
+                <p className="text-[10px] text-slate-500 font-mono">
+                  [PROMPT PASSCODES]: <code className="text-amber-400/80">RIPARIAN-FLOTSAM</code> • <code className="text-amber-400/80">VALAIS-1803</code> • <code className="text-amber-400/80">ORANGE-BISCUIT</code>
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // --- UNLOCKED INTERACTIVE BLUEPRINT EXPERIENCE ---
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col font-sans blueprint-grid">
+          
+          {/* Header */}
+          <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30 px-6 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-lg font-cinzel font-black tracking-wider text-amber-300">
+                  THE SWISS REPOSITORY // 1803
+                </h1>
+                <p className="text-xs font-mono text-slate-400">
+                  2,500 m² (26,909 sq ft) Subterranean Granite Facility • Canton of Valais
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <div className="hidden lg:flex items-center gap-4 text-xs font-mono bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-400">
+                <span>Depth: <strong className="text-white">200 ft</strong></span>
+                <span>Atmosphere: <strong className="text-sky-400">14°C // 42% RH</strong></span>
+              </div>
+              <div className="text-[10px] font-mono px-2.5 py-1.5 rounded-lg border border-emerald-800/60 bg-emerald-950/40 text-emerald-400">
+                CLEARANCE ACTIVE
+                {clearedAt && <span className="text-emerald-600/80 block sm:inline sm:ml-1">· {formatCleared(clearedAt)}</span>}
+              </div>
+              <button
+                onClick={handleRelock}
+                className="text-xs font-mono bg-slate-800 hover:bg-rose-950 hover:border-rose-800 hover:text-rose-300 text-slate-300 px-3 py-1.5 rounded border border-slate-700 transition"
+              >
+                🔒 Lock Vault
+              </button>
+            </div>
+          </header>
+
+          {/* Clearance strip */}
+          <div className="bg-amber-950/30 border-b border-amber-900/40 px-6 py-1.5 text-[10px] font-mono text-amber-200/80 flex flex-wrap justify-between gap-2">
+            <span>Whitmore, Sterling & Associates // Sole Fiduciary Custodianship (1678) // Non-divulgence in force</span>
+            <span className="text-amber-500/70">Deluxe Companion Access · The Immortal Consultant</span>
+          </div>
+
+          {/* Main Layout */}
+          <div className="flex-1 flex flex-col xl:flex-row p-6 gap-6 max-w-7xl mx-auto w-full">
+            
+            {/* LEFT: Architectural Blueprint View */}
+            <div className="xl:w-6/12 flex flex-col gap-4">
+              <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 glow-cyan">
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-sm font-cinzel font-bold tracking-widest text-sky-300 flex items-center gap-2">
+                    <span>📐</span> ARCHITECTURAL EXCAVATION PLAN (VALAIS, 1803)
+                  </h2>
+                  <span className="text-[10px] font-mono text-slate-500">SCALE: 1:250 // METRIC & CUBIT</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                  Click any excavated chamber on the blueprint to view holding specs, archival photographs, the 1808 appraisal report, and Perseus's personal notes.
+                </p>
+
+                {/* --- DETAILED ARCHITECTURAL SVG BLUEPRINT --- */}
+                <div className="w-full bg-[#030816] rounded-xl border border-sky-950/80 p-3 relative overflow-hidden shadow-inner">
+                  <svg viewBox="0 0 680 720" className="w-full h-auto select-none">
+                    <defs>
+                      {/* Bedrock rock hatch pattern */}
+                      <pattern id="bedrock" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                        <rect width="16" height="16" fill="#020617" />
+                        <line x1="0" y1="0" x2="0" y2="16" stroke="#0f172a" strokeWidth="1.5" />
+                        <line x1="8" y1="0" x2="8" y2="16" stroke="#1e293b" strokeWidth="0.5" strokeOpacity="0.4" />
+                      </pattern>
+                      {/* Sub-Level 7 lead shield hatch */}
+                      <pattern id="leadShield" width="8" height="8" patternUnits="userSpaceOnUse">
+                        <rect width="8" height="8" fill="#180c10" />
+                        <path d="M 0 0 L 8 8 M 8 0 L 0 8" stroke="#ef4444" strokeWidth="0.5" strokeOpacity="0.3" />
+                      </pattern>
+                    </defs>
+
+                    {/* Surrounding Mountain Granite Mass */}
+                    <rect width="680" height="720" fill="url(#bedrock)" />
+
+                    {/* Technical Grid Axis */}
+                    <line x1="340" y1="20" x2="340" y2="700" stroke="#0284c7" strokeWidth="1" strokeDasharray="3,6" opacity="0.3" />
+                    <line x1="20" y1="360" x2="660" y2="360" stroke="#0284c7" strokeWidth="1" strokeDasharray="3,6" opacity="0.3" />
+
+                    {/* Drainage Conduit (Perseus's Siphon to the Rhône) */}
+                    <path d="M 340 70 L 340 220 M 160 360 L 340 360 L 520 360 M 340 360 L 340 680" 
+                          fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeDasharray="6,4" opacity="0.6" />
+                    <text x="348" y="670" fill="#38bdf8" fontSize="8" fontFamily="Fira Code" opacity="0.8">▲ DRAINAGE SIPHON TO VALLEY (ELEV -65m)</text>
+
+                    {/* Mountain Adit & Outer Tunnel (Entrance from South) */}
+                    <rect x="315" y="580" width="50" height="110" fill="#090e17" stroke="#38bdf8" strokeWidth="2" />
+                    <line x1="315" y1="620" x2="365" y2="620" stroke="#ef4444" strokeWidth="2" />
+                    <text x="340" y="612" textAnchor="middle" fill="#94a3b8" fontSize="7" fontFamily="Fira Code">BLAST GATE 1</text>
+                    <line x1="315" y1="660" x2="365" y2="660" stroke="#ef4444" strokeWidth="2" />
+                    <text x="340" y="652" textAnchor="middle" fill="#94a3b8" fontSize="7" fontFamily="Fira Code">BLAST GATE 2</text>
+                    <text x="340" y="695" textAnchor="middle" fill="#38bdf8" fontSize="8" fontFamily="Cinzel">MOUNTAIN ADIT TUNNEL</text>
+
+                    {/* Inner Corridors */}
+                    <rect x="315" y="470" width="50" height="60" fill="#090e17" stroke="#38bdf8" strokeWidth="2" />
+                    <rect x="315" y="250" width="50" height="50" fill="#090e17" stroke="#38bdf8" strokeWidth="2" />
+                    <rect x="210" y="340" width="50" height="40" fill="#090e17" stroke="#38bdf8" strokeWidth="2" />
+                    <rect x="420" y="340" width="50" height="40" fill="#090e17" stroke="#38bdf8" strokeWidth="2" />
+
+                    {/* --- ROOM 1: ROTUNDA (SEC-01) --- */}
+                    <g onClick={() => setActiveRoom(REPOSITORY_DATA.rooms[0])} className="cursor-pointer blueprint-room">
+                      <polygon points="340,300 395,325 420,380 395,435 340,460 285,435 260,380 285,325"
+                               fill={activeRoom.id === 'rotunda' ? '#0f766e' : '#0c1524'}
+                               stroke={activeRoom.id === 'rotunda' ? '#2dd4bf' : '#38bdf8'}
+                               strokeWidth={activeRoom.id === 'rotunda' ? '3' : '2'} />
+                      {/* Supporting Pillars */}
+                      <circle cx="310" cy="350" r="5" fill="#38bdf8" opacity="0.8" />
+                      <circle cx="370" cy="350" r="5" fill="#38bdf8" opacity="0.8" />
+                      <circle cx="310" cy="410" r="5" fill="#38bdf8" opacity="0.8" />
+                      <circle cx="370" cy="410" r="5" fill="#38bdf8" opacity="0.8" />
+                      <text x="340" y="375" textAnchor="middle" fill="#f8fafc" fontSize="12" fontFamily="Cinzel" fontWeight="bold">ROTUNDA</text>
+                      <text x="340" y="392" textAnchor="middle" fill="#38bdf8" fontSize="9" fontFamily="Fira Code">SEC-01 (420 m²)</text>
+                    </g>
+
+                    {/* --- ROOM 2: ARMORY (SEC-02 ALPHA) --- */}
+                    <g onClick={() => setActiveRoom(REPOSITORY_DATA.rooms[1])} className="cursor-pointer blueprint-room">
+                      <rect x="40" y="270" width="170" height="180" rx="4"
+                            fill={activeRoom.id === 'armory' ? '#9a3412' : '#0c1524'}
+                            stroke={activeRoom.id === 'armory' ? '#fbbf24' : '#38bdf8'}
+                            strokeWidth={activeRoom.id === 'armory' ? '3' : '2'} />
+                      {/* Weapon Alcoves */}
+                      <rect x="50" y="280" width="20" height="35" fill="#1e293b" stroke="#38bdf8" strokeWidth="1" />
+                      <rect x="50" y="340" width="20" height="35" fill="#1e293b" stroke="#38bdf8" strokeWidth="1" />
+                      <rect x="50" y="400" width="20" height="35" fill="#1e293b" stroke="#38bdf8" strokeWidth="1" />
+                      {/* Central Display Bench */}
+                      <rect x="100" y="325" width="80" height="70" rx="3" fill="#1e293b" stroke="#fbbf24" strokeWidth="1" strokeDasharray="3,3" />
+                      <text x="140" y="355" textAnchor="middle" fill="#fef3c7" fontSize="13" fontFamily="Cinzel" fontWeight="bold">ARMORY</text>
+                      <text x="140" y="372" textAnchor="middle" fill="#fed7aa" fontSize="9" fontFamily="Fira Code">SEC-02 (ALPHA)</text>
+                      <text x="140" y="388" textAnchor="middle" fill="#94a3b8" fontSize="8" fontFamily="Fira Code">680 m² // OAK MOUNTS</text>
+                    </g>
+
+                    {/* --- ROOM 3: SCRIPTORIA (SEC-03 BETA) --- */}
+                    <g onClick={() => setActiveRoom(REPOSITORY_DATA.rooms[2])} className="cursor-pointer blueprint-room">
+                      <rect x="470" y="270" width="170" height="180" rx="4"
+                            fill={activeRoom.id === 'scriptoria' ? '#0369a1' : '#0c1524'}
+                            stroke={activeRoom.id === 'scriptoria' ? '#38bdf8' : '#38bdf8'}
+                            strokeWidth={activeRoom.id === 'scriptoria' ? '3' : '2'} />
+                      {/* Concentric Cedar Wall */}
+                      <rect x="490" y="290" width="130" height="140" rx="2" fill="none" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4,4" />
+                      <text x="555" y="355" textAnchor="middle" fill="#f8fafc" fontSize="13" fontFamily="Cinzel" fontWeight="bold">SCRIPTORIA</text>
+                      <text x="555" y="372" textAnchor="middle" fill="#bae6fd" fontSize="9" fontFamily="Fira Code">SEC-03 (BETA)</text>
+                      <text x="555" y="388" textAnchor="middle" fill="#94a3b8" fontSize="8" fontFamily="Fira Code">580 m² // CEDAR PODS</text>
+                    </g>
+
+                    {/* --- ROOM 4: REGALIA (SEC-04 GAMMA) --- */}
+                    <g onClick={() => setActiveRoom(REPOSITORY_DATA.rooms[3])} className="cursor-pointer blueprint-room">
+                      <rect x="250" y="520" width="180" height="85" rx="4"
+                            fill={activeRoom.id === 'regalia' ? '#6b21a8' : '#0c1524'}
+                            stroke={activeRoom.id === 'regalia' ? '#c084fc' : '#38bdf8'}
+                            strokeWidth={activeRoom.id === 'regalia' ? '3' : '2'} />
+                      {/* Display pedestals */}
+                      <circle cx="285" cy="562" r="10" fill="#1e293b" stroke="#c084fc" strokeWidth="1" />
+                      <circle cx="340" cy="562" r="12" fill="#1e293b" stroke="#c084fc" strokeWidth="1.5" />
+                      <circle cx="395" cy="562" r="10" fill="#1e293b" stroke="#c084fc" strokeWidth="1" />
+                      <text x="340" y="585" textAnchor="middle" fill="#f8fafc" fontSize="12" fontFamily="Cinzel" fontWeight="bold">REGALIA GALLERY</text>
+                      <text x="340" y="598" textAnchor="middle" fill="#e9d5ff" fontSize="8" fontFamily="Fira Code">SEC-04 (480 m²)</text>
+                    </g>
+
+                    {/* --- NORTHERN OFFSET CORRIDOR TO SUB-LEVEL 7 --- */}
+                    {/* Dog-leg corridor designed to deflect explosive overpressure */}
+                    <path d="M 340 300 L 340 230 L 260 230 L 260 145 L 340 145 L 340 120" 
+                          fill="none" stroke="#ef4444" strokeWidth="16" strokeLinejoin="miter" />
+                    <path d="M 340 300 L 340 230 L 260 230 L 260 145 L 340 145 L 340 120" 
+                          fill="none" stroke="#090e17" strokeWidth="12" strokeLinejoin="miter" />
+                    <text x="210" y="195" fill="#f87171" fontSize="8" fontFamily="Fira Code">◄ DOG-LEG BLAST BAFFLE</text>
+
+                    {/* --- ROOM 5: SUB-LEVEL 7 / LEVANTINE UNDERCROFT (SEC-05) --- */}
+                    <g onClick={() => setActiveRoom(REPOSITORY_DATA.rooms[4])} className="cursor-pointer blueprint-room">
+                      <rect x="220" y="30" width="240" height="90" rx="4"
+                            fill="url(#leadShield)"
+                            stroke={activeRoom.id === 'undercroft' ? '#f87171' : '#ef4444'}
+                            strokeWidth={activeRoom.id === 'undercroft' ? '3.5' : '2'} />
+                      {/* Heavy Lead Wall Outline */}
+                      <rect x="228" y="38" width="224" height="74" fill={activeRoom.id === 'undercroft' ? '#7f1d1d' : '#2d0607'} stroke="#ef4444" strokeWidth="1" strokeDasharray="3,3" />
+                      {/* Central Unopened Crate Symbol */}
+                      <rect x="315" y="55" width="50" height="35" fill="#1c1917" stroke="#fca5a5" strokeWidth="1.5" />
+                      <text x="340" y="75" textAnchor="middle" fill="#fca5a5" fontSize="12">⚠️</text>
+                      <text x="340" y="100" textAnchor="middle" fill="#fecaca" fontSize="11" fontFamily="Cinzel" fontWeight="bold">SUB-LEVEL 7 (LEVANTINE UNDERCROFT)</text>
+                      <text x="340" y="108" textAnchor="middle" fill="#f87171" fontSize="7" fontFamily="Fira Code">LEAD-SHEATHED // RESTRICTED ACCESS (ELEV -68.5m)</text>
+                    </g>
+
+                    {/* --- HISTORICAL ARCHITECTURAL CARTOUCHE (Bottom Left) --- */}
+                    <g transform="translate(30, 480)">
+                      <rect width="180" height="95" fill="#020617" stroke="#38bdf8" strokeWidth="1.5" />
+                      <line x1="0" y1="20" x2="180" y2="20" stroke="#38bdf8" strokeWidth="1" />
+                      <text x="10" y="14" fill="#38bdf8" fontSize="8" fontFamily="Cinzel" fontWeight="bold">CONFEDERATIO HELVETICA</text>
+                      <text x="10" y="34" fill="#f8fafc" fontSize="8" fontFamily="Cinzel">SUBTERRANEAN REPOSITORY</text>
+                      <text x="10" y="48" fill="#94a3b8" fontSize="7" fontFamily="Fira Code">CLIENT: P. ASTON ESQ.</text>
+                      <text x="10" y="60" fill="#94a3b8" fontSize="7" fontFamily="Fira Code">COUNSEL: WHITMORE & STERLING</text>
+                      <text x="10" y="72" fill="#94a3b8" fontSize="7" fontFamily="Fira Code">DATE: 14 NOVEMBRE 1803</text>
+                      <text x="10" y="85" fill="#38bdf8" fontSize="7" fontFamily="Fira Code">SURVEYOR: J. WHITMORE IV</text>
+                    </g>
+
+                    {/* Compass Rose */}
+                    <g transform="translate(620, 80)">
+                      <circle cx="0" cy="0" r="22" fill="#020617" stroke="#38bdf8" strokeWidth="1" />
+                      <polygon points="0,-18 4,-4 18,0 4,4 0,18 -4,4 -18,0 -4,-4" fill="#38bdf8" />
+                      <text x="0" y="-22" textAnchor="middle" fill="#38bdf8" fontSize="9" fontFamily="Cinzel" fontWeight="bold">N</text>
+                    </g>
+                  </svg>
+                </div>
+
+                {/* Quick Sector Selector Buttons */}
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                  {REPOSITORY_DATA.rooms.map(room => (
+                    <button
+                      key={room.id}
+                      onClick={() => setActiveRoom(room)}
+                      className={`p-2 rounded border text-left transition-all ${
+                        activeRoom.id === room.id 
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-md' 
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="text-[10px] opacity-75">{room.code}</div>
+                      <div className="truncate font-semibold">{room.name.split(':')[0]}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sole Fiduciary Clause Banner */}
+              <div className="p-4 bg-slate-900/40 border border-slate-800 rounded-xl space-y-1.5 text-xs text-slate-400">
+                <span className="font-cinzel font-bold text-amber-400 block text-xs">Sole Fiduciary Custodianship Indenture</span>
+                <p>
+                  Execution verified 1678 CE. Continued in perpetuity under customary English Chancery law. Unbroken title held by the firm in trust for the client without probate severance.
+                </p>
+              </div>
+            </div>
+
+            {/* RIGHT: Chamber Dossier, Artifacts & Inquests */}
+            <div className="xl:w-6/12 flex flex-col bg-slate-900/70 border border-slate-800 rounded-2xl p-6 glow-amber space-y-6">
+              
+              {/* Active Chamber Header */}
+              <div className={`border-b pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${activeRoom.id === 'undercroft' ? 'border-rose-900/60' : 'border-slate-800'}`}>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-mono px-2 py-0.5 rounded font-bold border ${activeRoom.id === 'undercroft' ? 'bg-rose-950/80 text-rose-300 border-rose-800/60' : 'bg-amber-950/80 text-amber-400 border-amber-800/60'}`}>
+                      {activeRoom.code}
+                    </span>
+                    <span className="text-xs font-mono text-slate-500">{activeRoom.depth}</span>
+                    {activeRoom.id === 'undercroft' && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 uppercase tracking-wider">Seals Intact</span>
+                    )}
+                  </div>
+                  <h3 className={`text-2xl font-cinzel font-black mt-1 ${activeRoom.id === 'undercroft' ? 'text-rose-100' : 'text-white'}`}>
+                    {activeRoom.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">{activeRoom.spec}</p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-mono">{activeRoom.status}</p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase block">AREA FOOTPRINT</span>
+                  <span className={`text-sm font-mono font-bold ${activeRoom.id === 'undercroft' ? 'text-rose-400' : 'text-teal-400'}`}>{activeRoom.area}</span>
+                </div>
+              </div>
+
+              {/* Chamber Sub-Tabs */}
+              <div className="flex border-b border-slate-800 gap-6 text-sm">
+                <button
+                  onClick={() => setActiveTab('inventory')}
+                  className={`pb-2.5 font-bold transition-colors ${activeTab === 'inventory' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  🏛️ Verified Artifacts ({activeRoom.items.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('appraisal')}
+                  className={`pb-2.5 font-bold transition-colors ${activeTab === 'appraisal' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  📜 1808 Inquest Certificate
+                </button>
+                <button
+                  onClick={() => setActiveTab('marginalia')}
+                  className={`pb-2.5 font-bold transition-colors ${activeTab === 'marginalia' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-slate-400 hover:text-white'}`}
+                >
+                  📌 Perseus's Notes
+                </button>
+              </div>
+
+              {/* TAB 1: ARTIFACT INVENTORY WITH PHOTO CARDS */}
+              {activeTab === 'inventory' && (
+                <div className="space-y-4 max-h-[560px] overflow-y-auto pr-1">
+                  {activeRoom.id === 'undercroft' && (
+                    <div className="p-3 rounded-xl border border-rose-800/70 bg-rose-950/40 text-rose-200 text-xs font-mono space-y-1 undercroft-active">
+                      <div className="font-bold text-rose-300 tracking-wider uppercase text-[11px]">⚠ Sub-Level 7 — Restricted Access</div>
+                      <p>Lead-sheathed redoubt. Clementine Bull of 1734 remains active. Seals on the Munich Crate are <strong className="text-rose-100">intact and unbroken</strong>. Examination refused by British Museum (1808). Do not part the lead bands.</p>
+                    </div>
+                  )}
+                  {activeRoom.items.map((item, idx) => (
+                    <div key={idx} className="p-4 bg-slate-950/90 rounded-xl border border-slate-800 space-y-3">
+                      
+                      {/* Artifact Title & Tag */}
+                      <div className="flex justify-between items-start gap-2 flex-wrap">
+                        <div>
+                          <span className="text-[10px] font-mono text-amber-500 uppercase font-bold tracking-widest">{item.id}</span>
+                          <h4 className="text-base font-bold text-white">{item.name}</h4>
+                        </div>
+                        <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                          {item.era} • {item.origin}
+                        </span>
+                      </div>
+
+                      {/* Display Image (If available) */}
+                      {item.img && (
+                        <div
+                          className="rounded-lg overflow-hidden border border-slate-800 relative group artifact-img-wrap"
+                          onClick={() => setLightboxItem(item)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter') setLightboxItem(item); }}
+                        >
+                          <img 
+                            src={item.img} 
+                            alt={item.name} 
+                            className="w-full h-48 object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-50 pointer-events-none" />
+                        </div>
+                      )}
+
+                      {/* Item Plaque Inscription */}
+                      {item.plaqueQuote && (
+                        <div className="p-2.5 bg-amber-950/20 border-l-2 border-amber-500 text-amber-200 text-xs font-serif italic">
+                          "{item.plaqueQuote}"
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-300 leading-relaxed">{item.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* TAB 2: 1808 APPRAISAL INQUEST REPORT */}
+              {activeTab === 'appraisal' && (
+                <div className="p-6 bg-[#17130d] border border-amber-900/50 rounded-xl shadow-inner text-amber-100 space-y-4 relative overflow-hidden">
+                  <div className="border-b border-amber-800/30 pb-3 flex justify-between items-baseline flex-wrap gap-2">
+                    <div>
+                      <span className="text-[10px] font-mono uppercase text-amber-400/80 block">Underwriters' Appraisal Schedule // Lloyd's Registry</span>
+                      <h4 className="text-lg font-cinzel font-bold text-amber-200">{activeRoom.report.appraiser}</h4>
+                    </div>
+                    <span className="text-xs font-mono text-amber-400/70">{activeRoom.report.date}</span>
+                  </div>
+
+                  <p className="text-xs leading-relaxed italic text-amber-100/90 font-serif">
+                    "{activeRoom.report.text}"
+                  </p>
+
+                  <div className="pt-3 border-t border-amber-800/30 flex justify-between items-center text-[11px] font-mono">
+                    <span className="text-amber-400/80">FORMAL VALUATION STATUS:</span>
+                    <span className="font-bold text-amber-300">{activeRoom.report.verdict}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: CLIENT MARGINALIA (PERSEUS'S STICKY NOTE) */}
+              {activeTab === 'marginalia' && (
+                <div className="p-6 bg-amber-100 text-slate-900 rounded-xl shadow-xl border border-amber-300 transform -rotate-1 relative">
+                  <div className="absolute -top-3 left-6 w-8 h-8 bg-amber-300/70 rounded-full shadow flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-600 shadow-sm"></div>
+                  </div>
+                  <span className="text-[11px] font-mono uppercase tracking-wider text-slate-600 block mb-2 font-bold">
+                    Marginal Annotation in Client's Hand:
+                  </span>
+                  <p className="text-2xl font-hand leading-relaxed font-bold text-slate-950">
+                    "{activeRoom.perseusNote}"
+                  </p>
+                  <span className="block text-right text-sm font-hand font-bold text-slate-700 mt-4">— P.</span>
+                </div>
+              )}
+
+            </div>
+          </div>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-800 bg-slate-950 px-6 py-4 text-xs font-mono text-slate-500 flex flex-col md:flex-row justify-between items-center gap-2">
+            <span>© 1803–2028 Whitmore, Sterling & Associates. All custodial rights unencumbered.</span>
+            <span>Deluxe Companion · <em>The Immortal Consultant</em> · Payhip Edition</span>
+          </footer>
+
+          {/* Artifact Lightbox */}
+          {lightboxItem && (
+            <div
+              className="lightbox-backdrop"
+              onClick={() => setLightboxItem(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-label={lightboxItem.name}
+            >
+              <div className="lightbox-card" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-start gap-3 p-4 border-b border-slate-800 bg-slate-900/80">
+                  <div>
+                    <span className="text-[10px] font-mono text-amber-500 uppercase tracking-widest font-bold">{lightboxItem.id}</span>
+                    <h3 className="text-lg font-cinzel font-bold text-white">{lightboxItem.name}</h3>
+                    <p className="text-xs font-mono text-slate-400 mt-0.5">{lightboxItem.era} · {lightboxItem.origin}</p>
+                  </div>
+                  <button
+                    onClick={() => setLightboxItem(null)}
+                    className="text-slate-400 hover:text-white text-xs font-mono px-2 py-1 rounded border border-slate-700 hover:border-slate-500"
+                  >
+                    ESC / Close
+                  </button>
+                </div>
+                {lightboxItem.img && (
+                  <img src={lightboxItem.img} alt={lightboxItem.name} className="lightbox-img" />
+                )}
+                <div className="p-4 space-y-2 bg-slate-950">
+                  {lightboxItem.plaqueQuote && (
+                    <p className="text-sm text-amber-200/90 italic font-serif border-l-2 border-amber-500 pl-3">
+                      "{lightboxItem.plaqueQuote}"
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400 leading-relaxed">{lightboxItem.desc}</p>
+                  {lightboxItem.tag && (
+                    <p className="text-[10px] font-mono text-slate-500 uppercase tracking-wide pt-1">{lightboxItem.tag}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
